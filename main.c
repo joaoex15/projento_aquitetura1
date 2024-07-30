@@ -6,75 +6,59 @@
 #include "conversao.c"
 
 void classificacao(struct projeto *proj, int index) {
-    char bin_opcode[7] = {0}; // Para armazenar o opcode em formato binário (6 bits + terminador nulo)
-    char  bin_opcodeT[33] = {0};
-    char bin_x[5];
-    char bin_y[5];
-    char bin_z[5];
-    uint32_t R[32] = { 0 };
+    int bin_opcode[6] = {0};  // Para armazenar os 6 bits do opcode
+    int bin_opcodeT[32] = {0}; // Para armazenar os primeiros 32 bits
+    int all_zero = 1; // Flag para verificar se todos os 32 bits são zero
 
-    // Obtém os primeiros 6 bits da string binária
-    strncpy(bin_opcode, proj->bins[index], 6);
-    
+    // Copia os primeiros 6 bits
+    for (int i = 0; i < 6; i++) {
+        bin_opcode[i] = proj->bins[index][i];
+    }
 
-    // Obtém os primeiros 32 bits da string binária
-    strncpy(bin_opcodeT, proj->bins[index], 32);
+    // Copia os primeiros 32 bits e verifica se todos são zero
+    for (int i = 0; i < 32; i++) {
+        bin_opcodeT[i] = proj->bins[index][i];
+        if (proj->bins[index][i] != 0) {
+            all_zero = 0;
+        }
+    }
 
     // Verifica se todos os 32 bits são zero
-    if (strncmp(bin_opcodeT, "00000000000000000000000000000000", 32) == 0) {
+    if (all_zero) {
         snprintf(proj->clas[index], sizeof(proj->clas[index]), "operação ociosa");
     } else {
-        if (strncmp(bin_opcode, "000000", 6) == 0) {
-        
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "mov R[] = R[]" );
-        }
-        else if (strncmp(bin_opcode, "000001", 6) == 0) {
-    
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "movs R[] = R[]" );
-        }
-
-
-    else if (strncmp(bin_opcode, "000010", 6) == 0) {
-        
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "add R[] = R[]" );
-            strncpy(bin_x,proj->bins[index] +  11, 5);
-            strncpy(bin_y,proj->bins[index] +  16, 5);
-            
-        }
-    else if (strncmp(bin_opcode, "000011", 6) == 0) {
-    
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "Sub R[] = R[]" );
-        }
-
-    else if (strncmp(bin_opcode, "000100", 6) == 0) {
-        // A varias operações similares com msm 6 digitos principais
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "mul R[] = R[]" );
-        }
-    else if (strncmp(bin_opcode, "000011", 6) == 0) {
-    
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "Cmp R[] = R[]" );
-        }
-
-
-
-
-        else if (strncmp(bin_opcode, "011000", 6) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "l8 R[] = MEM8[]" );
-        } else if (strncmp(bin_opcode, "011010", 6) == 0) {
-
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "l32 R[] = MEM32[]" );
-        } else if (strncmp(bin_opcode, "110111", 6) == 0) {
-    
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "bun " );
-        } else if (strncmp(bin_opcode, "111111", 6) == 0) {
+        if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 0, 0}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "mov R[] = R[]");
+        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 0, 1}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "movs R[] = R[]");
+        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 1, 0}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "add R[] = R[]");
+        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 1, 1}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "sub R[] = R[]");
+        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 1, 0, 0}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "mul R[] = R[]");
+        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 1, 1}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "cmp R[] = R[]");
+        } else if (memcmp(bin_opcode, (int[]){0, 1, 1, 0, 0, 0}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "l8 R[] = MEM8[]");
+        } else if (memcmp(bin_opcode, (int[]){0, 1, 1, 0, 1, 0}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "l32 R[] = MEM32[]");
+        } else if (memcmp(bin_opcode, (int[]){1, 1, 0, 1, 1, 1}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "bun");
+        } else if (memcmp(bin_opcode, (int[]){1, 1, 1, 1, 1, 1}, 6 * sizeof(int)) == 0) {
             snprintf(proj->clas[index], sizeof(proj->clas[index]), "int");
         } else {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "Instrução desconhecida: %s", bin_opcode);
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "Instrução desconhecida: %d%d%d%d%d%d",
+    bin_opcode[0], bin_opcode[1], bin_opcode[2], bin_opcode[3], bin_opcode[4], bin_opcode[5]);
         }
     }
 
     // Exemplo de saída para verificação
-    printf("Opcode: %s, Classificação: %s\n", bin_opcode, proj->clas[index]);
+    printf("Opcode: ");
+    for (int i = 0; i < 6; i++) {
+        printf("%d", bin_opcode[i]);
+    }
+    printf(", Classificação: %s\n", proj->clas[index]);
 }
 
 int main() {
