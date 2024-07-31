@@ -49,7 +49,7 @@ int main() {
         return 1;
     }
 
-    hex = fopen("/home/joao/Documentos/programas/ufs/projentos-arquitetura/1_erro.hex", "r");
+    hex = fopen("/home/rochajs/projento_aquitetura1/1_erro.hex", "r");
     if (hex == NULL) {
         perror("Erro ao abrir o arquivo");
         free(proj.MEM32); // Libera a memória alocada em caso de erro
