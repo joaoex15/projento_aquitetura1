@@ -1,10 +1,9 @@
 #include <stdio.h>
-#include <string.h>
-#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include "struct.h"
 #include "conversao.c"
-
+// Função de categorização
 void classificacao(struct projeto *proj, int index) {
     int bin_opcode[6] = {0};  // Para armazenar os 6 bits do opcode
     int bin_opcodeT[32] = {0}; // Para armazenar os primeiros 32 bits
@@ -12,13 +11,13 @@ void classificacao(struct projeto *proj, int index) {
 
     // Copia os primeiros 6 bits
     for (int i = 0; i < 6; i++) {
-        bin_opcode[i] = proj->bins[index][i];
+        bin_opcode[i] = proj->MEM32[index * 32 + i];
     }
 
     // Copia os primeiros 32 bits e verifica se todos são zero
     for (int i = 0; i < 32; i++) {
-        bin_opcodeT[i] = proj->bins[index][i];
-        if (proj->bins[index][i] != 0) {
+        bin_opcodeT[i] = proj->MEM32[index * 32 + i];
+        if (proj->MEM32[index * 32 + i] != 0) {
             all_zero = 0;
         }
     }
@@ -29,47 +28,31 @@ void classificacao(struct projeto *proj, int index) {
     } else {
         if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 0, 0}, 6 * sizeof(int)) == 0) {
             snprintf(proj->clas[index], sizeof(proj->clas[index]), "mov R[] = R[]");
-        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 0, 1}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "movs R[] = R[]");
-        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 1, 0}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "add R[] = R[]");
-        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 1, 1}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "sub R[] = R[]");
-        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 1, 0, 0}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "mul R[] = R[]");
-        } else if (memcmp(bin_opcode, (int[]){0, 0, 0, 0, 1, 1}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "cmp R[] = R[]");
-        } else if (memcmp(bin_opcode, (int[]){0, 1, 1, 0, 0, 0}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "l8 R[] = MEM8[]");
-        } else if (memcmp(bin_opcode, (int[]){0, 1, 1, 0, 1, 0}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "l32 R[] = MEM32[]");
-        } else if (memcmp(bin_opcode, (int[]){1, 1, 0, 1, 1, 1}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "bun");
-        } else if (memcmp(bin_opcode, (int[]){1, 1, 1, 1, 1, 1}, 6 * sizeof(int)) == 0) {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "int");
+        } else if (memcmp(bin_opcode, (int[]){0, 0, 1, 0, 0, 0}, 6 * sizeof(int)) == 0) {
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "soma R[] = R[] + R[]");
         } else {
-            snprintf(proj->clas[index], sizeof(proj->clas[index]), "Instrução desconhecida: %d%d%d%d%d%d",
-    bin_opcode[0], bin_opcode[1], bin_opcode[2], bin_opcode[3], bin_opcode[4], bin_opcode[5]);
+            snprintf(proj->clas[index], sizeof(proj->clas[index]), "operação desconhecida");
         }
     }
-
-    // Exemplo de saída para verificação
-    printf("Opcode: ");
-    for (int i = 0; i < 6; i++) {
-        printf("%d", bin_opcode[i]);
-    }
-    printf(", Classificação: %s\n", proj->clas[index]);
 }
 
 int main() {
+    struct projeto proj;
+    char linha[100];
     FILE *hex;
-    char linha[100];  // Array para armazenar cada linha lida
-    struct projeto proj;  // Declaração de uma instância da struct projeto
-    int index = 0;  // Índice para armazenar comandos no array hexcs
+    int index = 0;
+
+    // Aloca memória para MEM32
+    proj.MEM32 = (uint32_t *)malloc(100 * 32 * sizeof(uint32_t));
+    if (proj.MEM32 == NULL) {
+        perror("Erro ao alocar memória para MEM32");
+        return 1;
+    }
 
     hex = fopen("/home/joao/Documentos/programas/ufs/projentos-arquitetura/1_erro.hex", "r");
     if (hex == NULL) {
         perror("Erro ao abrir o arquivo");
+        free(proj.MEM32); // Libera a memória alocada em caso de erro
         return 1;
     }
 
@@ -91,5 +74,19 @@ int main() {
     }
 
     fclose(hex);
+
+    // Impressão dos resultados
+    printf("Hexadecimal e Binário:\n");
+    for (int i = 0; i < index; i++) {
+        printf("Linha %d: %s\n", i, proj.hexcs[i]);
+
+        printf("Binário: ");
+        for (int j = 0; j < 32; j++) {
+            printf("%d", proj.MEM32[i * 32 + j]);
+        }
+        printf("\nClassificação: %s\n\n", proj.clas[i]);
+    }
+
+    free(proj.MEM32); // Libera a memória alocada para MEM32
     return 0;
 }

@@ -1,15 +1,17 @@
-#ifndef CONVERSAO_H
-#define CONVERSAO_H
+#ifndef STRUCT_H
+#define STRUCT_H
 
-// Estrutura do projeto
-    struct projeto {
-    char hexcs[100][20];  // Array para armazenar strings hexadecimais
-    int bins[100][32];    // 32 bits binários (inteiros)
+#include <stdint.h>
 
-    char clas[100][100]; // classificação de formatos
+struct projeto {
+    char hexcs[100][100]; // Array para armazenar as linhas hexadecimais
+    uint32_t *MEM32;      // Ponteiro para armazenar os binários convertidos em 32 bits
+    uint8_t *MEM8;        // Ponteiro para armazenar os binários convertidos em 8 bits
+    char clas[100][100];  // Array para armazenar as classificações
 };
 
-// Declaração da função de conversão
+// Declaração das funções
 void conversao(struct projeto *proj, int index);
+void classificacao(struct projeto *proj, int index);
 
-#endif // CONVERSAO_H
+#endif // STRUCT_H

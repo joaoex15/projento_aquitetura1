@@ -1,11 +1,13 @@
-#include "struct.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include "struct.h"
 
 // Função de conversão hexadecimal para binário
 void conversao(struct projeto *proj, int index) {
     int ind_h = 2;  // Começa após o prefixo '0x'
-    int ind_b = 0;  // Índice para o binário
+    int ind_b = index * 32;  // Índice para o binário
 
     while (proj->hexcs[index][ind_h] != '\0') {
         char hex = proj->hexcs[index][ind_h];
@@ -35,12 +37,10 @@ void conversao(struct projeto *proj, int index) {
 
         // Copia os bits para o array de saída
         for (int i = 0; i < 4; i++) {
-            proj->bins[index][ind_b + i] = bin[i];
+            proj->MEM32[ind_b + i] = bin[i];
         }
 
         ind_b += 4; // Avança o índice de binário
         ind_h++; // Avança o índice hexadecimal
     }
-
-    proj->bins[index][ind_b] = '\0'; // Adiciona terminador nulo
 }
