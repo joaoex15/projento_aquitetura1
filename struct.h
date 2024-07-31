@@ -13,5 +13,6 @@ struct projeto {
 // Declaração das funções
 void conversao(struct projeto *proj, int index);
 void classificacao(struct projeto *proj, int index);
+void converter_MEM32_para_MEM8(struct projeto *proj);
 
 #endif // STRUCT_H
