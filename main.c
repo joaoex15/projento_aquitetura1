@@ -5,7 +5,6 @@
 
 struct projeto {
     uint32_t MEM32[32 * 1024]; // 32 KiB de memória em 32 bits
-    uint8_t MEM8[32 * 1024];   // 32 KiB de memória em 8 bits
 };
 
 int main() {
@@ -31,12 +30,6 @@ int main() {
 
         // Converte a linha hexadecimal para uint32_t e armazena em MEM32
         proj.MEM32[index] = (uint32_t)strtol(linha, NULL, 16);
-
-        // Armazena o valor também em MEM8 para acesso byte a byte
-        for (int i = 0; i < 4; i++) {
-            proj.MEM8[index * 4 + i] = (proj.MEM32[index] >> (24 - i * 8)) & 0xFF;
-        }
-
         index++;
     }
 
@@ -48,53 +41,69 @@ int main() {
         // Cadeia de caracteres da instrução
         char instrucao[30] = {0};
         // Declarando operandos
-        uint8_t z = 0, x = 0, i = 0;
-        uint32_t pc = 0, xyl = 0;
+        uint8_t z = 0, x = 0, y = 0;
+        int32_t l = 0;
+        uint32_t pc = 0;
         // Carregando a instrução de 32 bits (4 bytes) da memória indexada pelo PC (R29) no registrador IR (R28)
-        // É feita a leitura redundante com MEM8 e MEM32 para mostrar formas equivalentes de acesso
-        // Se X (MEM8) for igual a Y (MEM32), então X e Y são iguais a X | Y (redundância)
-        R[30] = ((proj.MEM8[R[29] + 0] << 24) | (proj.MEM8[R[29] + 1] << 16) | (proj.MEM8[R[29] + 2] << 8) | (proj.MEM8[R[29] + 3] << 0)) | proj.MEM32[R[29] >> 2];
+        R[30] = proj.MEM32[R[29] >> 2];
         // Obtendo o código da operação (6 bits mais significativos)
         uint8_t opcode = (R[30] & (0b111111 << 26)) >> 26;
         // Decodificando a instrução buscada na memória
         switch (opcode) {
-            // mov
+                // mov
             case 0b000000:
                 // Obtendo operandos
                 z = (R[30] & (0b11111 << 21)) >> 21;
-                xyl = R[30] & 0x1FFFFF;
+                l = R[30] & 0x1FFFFF;
                 // Execução do comportamento
-                R[z] = xyl;
+                R[z] = l;
                 // Formatação da instrução
-                sprintf(instrucao, "mov R%u,%u", z, xyl);
+                sprintf(instrucao, "mov R%u,%u", z, l);
                 // Formatação de saída em tela (deve mudar para o arquivo de saída)
-                printf("0x%08X:\t%-25s\tR%u=0x%08X\n", R[29], instrucao, z, xyl);
+                printf("0x%08X:\t%-25s\tR%u=0x%08X\n", R[29], instrucao, z, R[z]);
+                break;
+
+            // movs
+            case 0b000001:
+                // Obtendo operandos
+                z = (R[30] & (0b11111 << 21)) >> 21;
+                l = (R[30] & 0x1FFFFF);
+                // Extensão de sinal
+                if (l & (1 << 20)) {
+                    l |= 0xFFE00000; // Extende o sinal para os 21 bits
+                }
+                // Execução do comportamento
+                R[z] = l;
+                // Formatação da instrução
+                sprintf(instrucao, "movs R%u,%d", z, l);
+                // Formatação de saída em tela (deve mudar para o arquivo de saída)
+                printf("0x%08X:\t%-25s\tR%u=0x%08X\n", R[29], instrucao, z, R[z]);
                 break;
             // l8
             case 0b011000:
                 // Obtendo operandos
                 z = (R[30] & (0b11111 << 21)) >> 21;
                 x = (R[30] & (0b11111 << 16)) >> 16;
-                i = R[30] & 0xFFFF;
-                // Execução do comportamento com MEM8 e MEM32 (cálculo do índice da palavra e seleção do byte big-endian)
-                R[z] = proj.MEM8[R[x] + i] | (((uint8_t*)(&proj.MEM32[(R[x] + i) >> 2]))[3 - ((R[x] + i) % 4)]);
+                l = R[30] & 0xFFFF;
+                // Execução do comportamento com MEM32 (cálculo do índice da palavra e seleção do byte big-endian)
+                R[z] = ((uint8_t*)(&proj.MEM32[(R[x] + l) >> 2]))[3 - ((R[x] + l) % 4)];
                 // Formatação da instrução
-                sprintf(instrucao, "l8 R%u,[R%u%s%i]", z, x, (i >= 0) ? ("+") : (""), i);
+                sprintf(instrucao, "l8 R%u,[R%u%s%i]", z, x, (l >= 0) ? ("+") : (""), l);
                 // Formatação de saída em tela (deve mudar para o arquivo de saída)
-                printf("0x%08X:\t%-25s\tR%u=MEM[0x%08X]=0x%02X\n", R[29], instrucao, z, R[x] + i, R[z]);
+                printf("0x%08X:\t%-25s\tR%u=MEM[0x%08X]=0x%02X\n", R[29], instrucao, z, R[x] + l, R[z]);
                 break;
             // l32
             case 0b011010:
                 // Obtendo operandos
                 z = (R[30] & (0b11111 << 21)) >> 21;
                 x = (R[30] & (0b11111 << 16)) >> 16;
-                i = R[30] & 0xFFFF;
-                // Execução do comportamento com MEM8 e MEM32
-                R[z] = ((proj.MEM8[((R[x] + i) << 2) + 0] << 24) | (proj.MEM8[((R[x] + i) << 2) + 1] << 16) | (proj.MEM8[((R[x] + i) << 2) + 2] << 8) | (proj.MEM8[((R[x] + i) << 2) + 3] << 0)) | proj.MEM32[R[x] + i];
+                l = R[30] & 0xFFFF;
+                // Execução do comportamento com MEM32
+                R[z] = proj.MEM32[(R[x] + l) >> 2];
                 // Formatação da instrução
-                sprintf(instrucao, "l32 R%u,[R%u%s%i]", z, x, (i >= 0) ? ("+") : (""), i);
+                sprintf(instrucao, "l32 R%u,[R%u%s%i]", z, x, (l >= 0) ? ("+") : (""), l);
                 // Formatação de saída em tela (deve mudar para o arquivo de saída)
-                printf("0x%08X:\t%-25s\tR%u=MEM[0x%08X]=0x%08X\n", R[29], instrucao, z, (R[x] + i) << 2, R[z]);
+                printf("0x%08X:\t%-25s\tR%u=MEM[0x%08X]=0x%08X\n", R[29], instrucao, z, (R[x] + l) << 2, R[z]);
                 break;
             // bun
             case 0b110111:
