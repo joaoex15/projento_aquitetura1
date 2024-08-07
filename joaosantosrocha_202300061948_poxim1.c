@@ -88,16 +88,23 @@ int main() {
                 z = (R[30] >> 21) & 0x1F;
                 x = (R[30] >> 16) & 0x1F;
                 y = (R[30] >> 11) & 0x1F;
-
+                
                 uint64_t resultado = (uint64_t)R[x] + (uint64_t)R[y];
                 R[z] = (uint32_t)resultado;
 
                 ZN = (R[z] == 0) ? 1 : 0;
                 SN = ((int32_t)R[z] < 0) ? 1 : 0;
-                CY = (resultado > 0xFFFFFFFF) ? 1 : 0;
-                OV = (((R[x] & (1 << 31)) != (R[y] & (1 << 31)) && ((R[z] & (1 << 31)) == (R[y] & (1 << 31)))) ? 1 : 0);
-
-                atualizar_SR(R, ZN, SN, CY, IV);
+                if (x<0&&y<0)
+                {
+                                    OV = (((R[x] & (1 << 31)) != (R[y] & (1 << 31)) && ((R[z] & (1 << 31)) == (R[y] & (1 << 31)))) ? 1 : 0);
+                }
+                else
+                {
+                            CY = (resultado >= 0xFFFFFFFF) ? 1 : 0;
+                }
+                
+    
+                atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
                 sprintf(instrucao, "add R%u,R%u,R%u", z, x, y);
                 printf("0x%08X:\t%-25s\tR%u=R%u+R%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], R[31]);
@@ -114,15 +121,19 @@ int main() {
 
                 ZN = (R[z] == 0) ? 1 : 0;
                 SN = ((int32_t)R[z] < 0) ? 1 : 0;
-                CY = (resultado < 0) ? 1 : 0;
                 OV = (((R[x] & (1 << 31)) != (R[y] & (1 << 31)) && ((R[z] & (1 << 31)) != (R[y] & (1 << 31)))) ? 1 : 0);
 
-                if (SN) {
-                    atualizar_SR_sem_CY(R, ZN, SN, OV, IV);
-                } else {
-                    atualizar_SR_sem_OV(R, ZN, SN, CY, IV);
-                }
+                if (x<0&&y<0)
+                {
+                    OV = (((R[x] & (1 << 31)) != (R[y] & (1 << 31)) && ((R[z] & (1 << 31)) == (R[y] & (1 << 31)))) ? 1 : 0);
 
+                }
+                else
+                {
+                            CY = (resultado >= 0xFFFFFFFF) ? 1 : 0;
+                }
+        
+                atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
                 sprintf(instrucao, "sub R%u,R%u,R%u", z, x, y);
                 printf("0x%08X:\t%-25s\tR%u=R%u-R%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], R[31]);
                 break;
@@ -143,7 +154,7 @@ int main() {
         ZN = (result == 0) ? 0b01000000 : 0x00000000;
         CY = (result != 0) ? 0b00000001 : 0x00000000;
 
-        atualizar_SR(R, ZN, 0, CY, 0, 0);
+        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
         sprintf(instrucao, "mul R%u,R%u,R%u", l, z, y);
         printf("0x%08X:\t%-25s\tR%u:R%u=R%u*R%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, l, z, x, y, R[l], R[z], R[31]);
@@ -156,7 +167,7 @@ int main() {
         ZN = (result == 0) ? 0b01000000 : 0x00000000;
         CY = (R[z] != 0) ? 0b00000001 : 0x00000000;
 
-        atualizar_SR(R, ZN, 0, CY, 0, 0);
+        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
         sprintf(instrucao, "sll R%u,R%u,R%u", z, x, y);
         printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u<<%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
@@ -168,7 +179,7 @@ int main() {
         ZN = (result == 0) ? 0b01000000 : 0x00000000;
         OV = (result != (int64_t)(int32_t)R[z]) ? 0b00001000 : 0x00000000;
 
-        atualizar_SR(R, ZN, OV, 0, 0, 0);
+        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
         sprintf(instrucao, "muls R%u,R%u,R%u", l, z, y);
         printf("0x%08X:\t%-25s\tR%u:R%u=R%u*R%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, l, z, x, y, R[l], R[z], R[31]);
@@ -181,7 +192,7 @@ int main() {
         ZN = (result == 0) ? 0b01000000 : 0x00000000;
         OV = (result != (int32_t)R[z]) ? 0b00001000 : 0x00000000;
 
-        atualizar_SR(R, ZN, OV, 0, 0, 0);
+        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
         sprintf(instrucao, "sla R%u,R%u,R%u", z, x, y);
         printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u<<%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
@@ -198,7 +209,7 @@ int main() {
         ZD = (R[y] == 0) ? 0b00010000 : 0x00000000;
         CY = (R[l] != 0) ? 0b00000001 : 0x00000000;
 
-        atualizar_SR(R, ZN, 0, CY, ZD, 0);
+        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
         sprintf(instrucao, "div R%u,R%u,R%u", l, z, y);
         printf("0x%08X:\t%-25s\tR%u=R%u/R%u=0x%08X, R%u=R%u%%R%u=0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], l, x, y, R[l], R[31]);
@@ -211,7 +222,7 @@ int main() {
         ZN = (result == 0) ? 0b01000000 : 0x00000000;
         CY = ((result & 0x01) != 0) ? 0b00000001 : 0x00000000;
 
-        atualizar_SR(R, ZN, 0, CY, 0, 0);
+        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
         sprintf(instrucao, "srl R%u,R%u,R%u", z, x, y);
         printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u>>%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
@@ -230,7 +241,7 @@ int main() {
         ZD = (R[y] == 0) ? 0b00010000 : 0x00000000;
         OV = (R[z] != (int32_t)R[z]) ? 0b00001000 : 0x00000000;
 
-        atualizar_SR(R, ZN, OV, 0, ZD, 0);
+        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
         sprintf(instrucao, "divs R%u,R%u,R%u", l, z, y);
         printf("0x%08X:\t%-25s\tR%u=R%u/R%u=0x%08X, R%u=R%u%%R%u=0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], l, x, y, R[l], R[31]);
@@ -243,7 +254,7 @@ int main() {
         ZN = (result == 0) ? 0b01000000 : 0x00000000;
         OV = ((result & 0x80000000) != 0) ? 0b00001000 : 0x00000000;
 
-        atualizar_SR(R, ZN, OV, 0, 0, 0);
+        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
 
         sprintf(instrucao, "sra R%u,R%u,R%u", z, x, y);
         printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u>>%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
@@ -252,89 +263,79 @@ int main() {
 }
 
 
-            case 0b000101: { // l8
-                z = (R[30] >> 21) & 0x1F;
-                x = (R[30] >> 16) & 0x1F;
-
-                if (R[x] < 0 || R[x] >= sizeof(proj.MEM8)) {
-                    IV = 1;
-                    atualizar_SR_sem_OV(R, ZN, SN, CY, IV);
-                    sprintf(instrucao, "l8 R%u, R%u (Endereço fora dos limites)", z, x);
-                } else {
-                    R[z] = proj.MEM8[R[x]];
-                    ZN = (R[z] == 0) ? 1 : 0;
-                    SN = ((int32_t)R[z] < 0) ? 1 : 0;
-                    CY = 0;
-                    OV = 0;
-
-                    atualizar_SR_sem_CY(R, ZN, SN, OV, IV);
-
-                    sprintf(instrucao, "l8 R%u,R%u", z, x);
-                }
-                printf("0x%08X:\t%-25s\tR%u=0x%02X, SR=0x%08X\n", R[29], instrucao, z, R[z], R[31]);
+            case 0b011000: { // l8
+                // Obtendo operandos
+                z = (R[30] & (0b11111 << 21)) >> 21;
+                x = (R[30] & (0b11111 << 16)) >> 16;
+                l = R[30] & 0xFFFF;
+                // Execução do comportamento com MEM32 (cálculo do índice da palavra e seleção do byte big-endian)
+                R[z] = ((uint8_t*)(&proj.MEM32[(R[x] + l) >> 2]))[3 - ((R[x] + l) % 4)];
+                // Atualizando SR
+                ZN = (R[z] == 0) ? 1 : 0;
+                SN = (R[z] & (1 << 7)) ? 1 : 0; 
+                
+                // Formatação da instrução
+                sprintf(instrucao, "l8 R%u,[R%u%s%i]", z, x, (l >= 0) ? ("+") : (""), l);
+                // Formatação de saída em tela (deve mudar para o arquivo de saída)
+                printf("0x%08X:\t%-25s\tR%u=MEM[0x%08X]=0x%02X\n", R[29], instrucao, z, R[x] + l, R[z]);
                 break;
             }
 
-            case 0b000110: { // l32
-                z = (R[30] >> 21) & 0x1F;
-                x = (R[30] >> 16) & 0x1F;
-
-                if (R[x] < 0 || R[x] >= sizeof(proj.MEM32)) {
-                    IV = 1;
-                    atualizar_SR_sem_OV(R, ZN, SN, CY, IV);
-                    sprintf(instrucao, "l32 R%u,R%u (Endereço fora dos limites)", z, x);
-                } else {
-                    R[z] = proj.MEM32[R[x] >> 2];
-                    ZN = (R[z] == 0) ? 1 : 0;
-                    SN = ((int32_t)R[z] < 0) ? 1 : 0;
-                    CY = 0;
-                    OV = 0;
-
-                    atualizar_SR_sem_CY(R, ZN, SN, OV, IV);
-
-                    sprintf(instrucao, "l32 R%u,R%u", z, x);
-                }
-                printf("0x%08X:\t%-25s\tR%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, R[z], R[31]);
+            case 0b011010: { // l32
+                z = (R[30] & (0b11111 << 21)) >> 21;
+                x = (R[30] & (0b11111 << 16)) >> 16;
+                l = R[30] & 0xFFFF;
+                // Execução do comportamento com MEM32
+                R[z] = proj.MEM32[(R[x] + l) >> 2];
+                // Atualizando SR
+                
+                // Formatação da instrução
+                sprintf(instrucao, "l32 R%u,[R%u%s%i]", z, x, (l >= 0) ? ("+") : (""), l);
+                // Formatação de saída em tela (deve mudar para o arquivo de saída)
+                printf("0x%08X:\t%-25s\tR%u=MEM[0x%08X]=0x%08X\n", R[29], instrucao, z, (R[x] + l) << 2, R[z]);
                 break;
+
             }
 
-            case 0b000111: { // bun
-                x = (R[30] >> 21) & 0x1F;
-                int32_t offset = (R[30] & 0x1FFFFF) << 2; // Endereço de salto, deslocamento multiplicado por 4
-
-                if (offset < 0 || (uint32_t)offset >= sizeof(proj.MEM32) * 4) {
-                    IV = 1;
-                    atualizar_SR_sem_OV(R, ZN, SN, CY, IV);
-                    sprintf(instrucao, "bun R%u, endereço fora dos limites", x);
-                } else {
-                    R[29] = offset; // Atualiza o PC com o endereço de salto
-                    sprintf(instrucao, "bun R%u", x);
-                }
-                printf("0x%08X:\t%-25s\tPC=0x%08X, SR=0x%08X\n", R[29], instrucao, R[29], R[31]);
+            case 0b110111: { // bun
+               // Armazenando o PC antigo
+                pc = R[29];
+                // Execução do comportamento
+                R[29] = R[29] + ((R[30] & 0x3FFFFFF) << 2);
+                // Atualizando SR
+                
+                // Formatação da instrução
+                sprintf(instrucao, "bun %i", R[30] & 0x3FFFFFF);
+                // Formatação de saída em tela (deve mudar para o arquivo de saída)
+                printf("0x%08X:\t%-25s\tPC=0x%08X\n", pc, instrucao, R[29] + 4);
                 break;
+
             }
 
-            case 0b001000: { // int
-                x = (R[30] >> 21) & 0x1F;
-                R[31] |= (1 << x); // Define a flag de interrupção correspondente
-
-                sprintf(instrucao, "int R%u", x);
-                printf("0x%08X:\t%-25s\tSR=0x%08X\n", R[29], instrucao, R[31]);
+            case 0b111111: { // int
+              // Parar a execução
+                executa = 0;
+                // Atualizando SR
+                
+                
+                // Formatação da instrução
+                sprintf(instrucao, "int 0");
+                // Formatação de saída em tela (deve mudar para o arquivo de saída)
+                printf("0x%08X:\t%-25s\tCR=0x00000000,PC=0x00000000\n", R[29], instrucao);
                 break;
+
             }
 
             default:
-                IV = 1;
-                atualizar_SR_sem_OV(R, ZN, SN, CY, IV);
+                
+                atualizar_SR(R, ZN,ZD, SN,OV, IV, CY);
                 sprintf(instrucao, "instrução inválida");
                 printf("0x%08X:\t%-25s\n", R[29], instrucao);
                 break;
         }
 
         R[29] += 4; // Incrementa o PC para a próxima instrução
-        if (R[29] >= sizeof(proj.MEM32) * 4) {
-            executa = 0;
-        }
+        
     }
 
     return 0;
