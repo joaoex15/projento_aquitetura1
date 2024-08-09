@@ -8,35 +8,6 @@ struct projeto {
 	uint32_t* MEM32 ;
 };
 
-// Atualiza o registrador de status sem a flag de Overflow
-void atualizar_SR(uint32_t *R, uint32_t ZN, uint32_t ZD, uint32_t SN, uint32_t OV, uint32_t IV, uint32_t CY) {
-    // Máscaras para cada flag no registrador de status
-    const uint32_t ZN_MASK = 0b00000000000000000000000001000000; // Zero flag (bit 6)
-    const uint32_t ZD_MASK = 0b00000000000000000000000000100000; // Zero Detect flag (bit 5)
-    const uint32_t SN_MASK = 0b00000000000000000000000000010000; // Sign flag (bit 4)
-    const uint32_t OV_MASK = 0b00000000000000000000000000001000; // Overflow flag (bit 3)
-    const uint32_t IV_MASK = 0b00000000000000000000000000000100; // Instruction Valid flag (bit 2)
-    const uint32_t CY_MASK = 0b00000000000000000000000000000001; // Carry flag (bit 0)
-
-    // Obter o valor atual do registrador de status
-    uint32_t sr = R[31];
-    
-    // Limpar os bits dos flags antes de atualizar
-    sr &= ~(ZN_MASK | ZD_MASK | SN_MASK | OV_MASK | IV_MASK | CY_MASK);
-    
-    // Configurar os bits dos flags com base nos valores fornecidos
-    if (ZN) sr |= ZN_MASK;
-    if (ZD) sr |= ZD_MASK;
-    if (SN) sr |= SN_MASK;
-    if (OV) sr |= OV_MASK;
-    if (IV) sr |= IV_MASK;
-    if (CY) sr |= CY_MASK;
-
-    // Atualizar o registrador de status
-    R[31] = sr;
-}
-
-
 
 int main() {
     struct projeto proj;
@@ -97,52 +68,91 @@ int main() {
                 break;
 
             case 0b000010: { // add
-                z = (R[28] >> 21) & 0x1F;
-                x = (R[28] >> 16) & 0x1F;
-                y = (R[28] >> 11) & 0x1F;
-                
-                uint64_t resultado = (uint64_t)R[x] + (uint64_t)R[y];
-                R[z] = (uint32_t)resultado;
+    z = (R[28] >> 21) & 0x1F;
+    x = (R[28] >> 16) & 0x1F;
+    y = (R[28] >> 11) & 0x1F;
 
-                ZN = (R[z] == 0) ? 1 : 0;
-                SN = ((int32_t)R[z] < 0) ? 1 : 0;
-                if (x<0&&y<0)
-                {
-                                    OV = (((R[x] & (1 << 31)) != (R[y] & (1 << 31)) && ((R[z] & (1 << 31)) == (R[y] & (1 << 31)))) ? 1 : 0);
-                }
-                else
-                {
-                            CY = (resultado > 0xFFFFFFFF) ? 1 : 0;
-                }
-                
+    uint64_t resultado = (uint64_t)R[x] + (uint64_t)R[y];
+    R[z] = (uint32_t)resultado;
+
+    // Zero flag (ZN)
+    if (R[z] == 0) {
+        R[31] |= (1 << 6);  // Define o bit 6 se R[z] for 0
+    } else {
+        R[31] &= ~(1 << 6);  // Limpa o bit 6 se R[z] não for 0
+    }
+
+    // Sign flag (SN)
+    if ((int32_t)R[z] < 0) {
+        R[31] |= (1 << 4);  // Define o bit 4 se R[z] for negativo
+    } else {
+        R[31] &= ~(1 << 4);  // Limpa o bit 4 se R[z] não for negativo
+    }
+
+    // Overflow flag (OV)
+    int32_t x_signed = (int32_t)R[x];
+    int32_t y_signed = (int32_t)R[y];
+    int32_t z_signed = (int32_t)R[z];
     
-                atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
+    if ((x_signed > 0 && y_signed > 0 && z_signed < 0) || 
+        (x_signed < 0 && y_signed < 0 && z_signed > 0)) {
+        R[31] |= (1 << 3);  // Define o bit 3 se houver overflow
+    } else {
+        R[31] &= ~(1 << 3);  // Limpa o bit 3 se não houver overflow
+    }
 
-                sprintf(instrucao, "add R%u,R%u,R%u", z, x, y);
-                printf("0x%08X:\t%-25s\tR%u=R%u+R%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], R[31]);
-                break;
-            }
+    // Carry flag (CY)
+    if (resultado > 0xFFFFFFFF) {
+        R[31] |= (1 << 0);  // Define o bit 0 se houver carry
+    } else {
+        R[31] &= ~(1 << 0);  // Limpa o bit 0 se não houver carry
+    }
+
+    sprintf(instrucao, "add R%u,R%u,R%u", z, x, y);
+    printf("0x%08X:\t%-25s\tR%u=R%u+R%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], R[31]);
+    break;
+}
+
 
 
 
 case 0b000011: { // sub
-           z = (R[28] >> 21) & 0x1F;
-                x = (R[28] >> 16) & 0x1F;
-                y = (R[28] >> 11) & 0x1F;
-                
+    
+    z = (R[28] >> 21) & 0x1F;
+    x = (R[28] >> 16) & 0x1F;
+    y = (R[28] >> 11) & 0x1F;
 
     R[z] = R[x] - R[y]; // Resultado da subtração
 
     // Atualização dos flags
-    ZN = (R[z] == 0) ? 1 : 0; // Zero Flag (ZN)
-    SN = (R[z] & (1 << 31)) ? 1 : 0; // Sign Flag (SN)
 
-    OV = (((R[x] & (1 << 31)) != (R[y] & (1 << 31))) && ((R[z] & (1 << 31)) == (R[y] & (1 << 31)))) ? 1 : 0;
+    // Zero Flag (ZN)
+    if (R[z] == 0) {
+        R[31] |= (1 << 6);  // Define o bit 6 se R[z] for 0
+    } else {
+        R[31] &= ~(1 << 6);  // Limpa o bit 6 se R[z] não for 0
+    }
 
-    CY = (R[x] < R[y]) ? 1 : 0; // Carry Flag (CY)
+    // Sign Flag (SN)
+    if (R[z] & (1 << 31)) {
+        R[31] |= (1 << 4);  // Define o bit 4 se R[z] for negativo
+    } else {
+        R[31] &= ~(1 << 4);  // Limpa o bit 4 se R[z] não for negativo
+    }
 
-    // Atualiza o registrador de status
-    atualizar_SR(R, ZN, ZD, SN, OV, IV, CY);
+    // Overflow Flag (OV)
+    if (((R[x] & (1 << 31)) != (R[y] & (1 << 31))) && ((R[z] & (1 << 31)) == (R[y] & (1 << 31)))) {
+        R[31] |= (1 << 3);  // Define o bit 3 se houver overflow
+    } else {
+        R[31] &= ~(1 << 3);  // Limpa o bit 3 se não houver overflow
+    }
+
+    // Carry Flag (CY)
+    if (R[x] < R[y]) {
+        R[31] |= (1 << 0);  // Define o bit 0 se houver carry
+    } else {
+        R[31] &= ~(1 << 0);  // Limpa o bit 0 se não houver carry
+    }
 
     // Impressão do resultado
     sprintf(instrucao, "sub R%u,R%u,R%u", z, x, y);
@@ -152,125 +162,256 @@ case 0b000011: { // sub
 
 
 
+case 0b000100: {
+    uint32_t func = (R[28] >> 8) & 0x7;
 
-
-
-    case 0b000100:{
-        uint32_t func =(R[28]>>8)&0x7;
-        if (func == 0b000) { // mul - Multiplicação sem sinal
+    if (func == 0b000) { // mul - Multiplicação sem sinal
         uint64_t result = (uint64_t)R[x] * (uint64_t)R[y];
         R[l] = (uint32_t)(result >> 32); // Parte alta
         R[z] = (uint32_t)result;         // Parte baixa
 
-        ZN = (result == 0) ? 0b01000000 : 0x00000000;
-        CY = (result != 0) ? 0b00000001 : 0x00000000;
+        // Atualização das flags
 
-        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
+        // Zero Flag (ZN)
+        if (result == 0) {
+            R[31] |= (1 << 6);  // Define o bit 6 se o resultado for 0
+        } else {
+            R[31] &= ~(1 << 6);  // Limpa o bit 6 se o resultado não for 0
+        }
 
+        // Sign Flag (SN)
+        if (R[z] & (1 << 31)) {
+            R[31] |= (1 << 4);  // Define o bit 4 se o resultado for negativo
+        } else {
+            R[31] &= ~(1 << 4);  // Limpa o bit 4 se o resultado não for negativo
+        }
+
+        // Impressão do resultado
         sprintf(instrucao, "mul R%u,R%u,R%u", l, z, y);
-        printf("0x%08X:\t%-25s\tR%u:R%u=R%u*R%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, l, z, x, y, R[l], R[z], R[31]);
-    } else if (func == 0b001) { // sll - Deslocamento lógico para a esquerda
-        uint64_t combined = ((uint64_t)R[z] << 32) | R[y];
-        uint64_t result = combined << (l + 1);
-        R[z] = (uint32_t)(result >> 32);
-        R[x] = (uint32_t)result;
-
-        ZN = (result == 0) ? 0b01000000 : 0x00000000;
-        CY = (R[z] != 0) ? 0b00000001 : 0x00000000;
-
-        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
-
-        sprintf(instrucao, "sll R%u,R%u,R%u", z, x, y);
-        printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u<<%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
-    } else if (func == 0b010) { // muls - Multiplicação com sinal
-        int64_t result = (int64_t)R[x] * (int64_t)R[y];
-        R[l] = (uint32_t)(result >> 32); // Parte alta
-        R[z] = (uint32_t)result;         // Parte baixa
-
-        ZN = (result == 0) ? 0b01000000 : 0x00000000;
-        OV = (result != (int64_t)(int32_t)R[z]) ? 0b00001000 : 0x00000000;
-
-        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
-
-        sprintf(instrucao, "muls R%u,R%u,R%u", l, z, y);
-        printf("0x%08X:\t%-25s\tR%u:R%u=R%u*R%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, l, z, x, y, R[l], R[z], R[31]);
-    } else if (func == 0b011) { // sla - Deslocamento aritmético para a esquerda
-        int64_t combined = ((int64_t)R[z] << 32) | R[y];
-        int64_t result = combined << (l + 1);
-        R[z] = (uint32_t)(result >> 32);
-        R[x] = (uint32_t)result;
-
-        ZN = (result == 0) ? 0b01000000 : 0x00000000;
-        OV = (result != (int32_t)R[z]) ? 0b00001000 : 0x00000000;
-
-        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
-
-        sprintf(instrucao, "sla R%u,R%u,R%u", z, x, y);
-        printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u<<%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
-    } else if (func == 0b100) { // div - Divisão sem sinal
-        if (R[y] != 0) {
-            R[z] = R[x] / R[y];
-            R[l] = R[x] % R[y];
-        } else {
-            R[z] = 0; // Divisão por zero
-            R[l] = 0;
-        }
-
-        ZN = (R[z] == 0) ? 0b01000000 : 0x00000000;
-        ZD = (R[y] == 0) ? 0b00010000 : 0x00000000;
-        CY = (R[l] != 0) ? 0b00000001 : 0x00000000;
-
-        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
-
-        sprintf(instrucao, "div R%u,R%u,R%u", l, z, y);
-        printf("0x%08X:\t%-25s\tR%u=R%u/R%u=0x%08X, R%u=R%u%%R%u=0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], l, x, y, R[l], R[31]);
-    } else if (func == 0b101) { // srl - Deslocamento lógico para a direita
-        uint64_t combined = ((uint64_t)R[z] << 32) | R[y];
-        uint64_t result = combined >> (l + 1);
-        R[z] = (uint32_t)(result >> 32);
-        R[x] = (uint32_t)result;
-
-        ZN = (result == 0) ? 0b01000000 : 0x00000000;
-        CY = ((result & 0x01) != 0) ? 0b00000001 : 0x00000000;
-
-        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
-
-        sprintf(instrucao, "srl R%u,R%u,R%u", z, x, y);
-        printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u>>%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
-    } else if (func == 0b110) { // divs - Divisão com sinal
-        if (R[y] != 0) {
-            int32_t div = (int32_t)R[x] / (int32_t)R[y];
-            int32_t mod = (int32_t)R[x] % (int32_t)R[y];
-            R[z] = (uint32_t)div;
-            R[l] = (uint32_t)mod;
-        } else {
-            R[z] = 0; // Divisão por zero
-            R[l] = 0;
-        }
-
-        ZN = (R[z] == 0) ? 0b01000000 : 0x00000000;
-        ZD = (R[y] == 0) ? 0b00010000 : 0x00000000;
-        OV = (R[z] != (int32_t)R[z]) ? 0b00001000 : 0x00000000;
-
-        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
-
-        sprintf(instrucao, "divs R%u,R%u,R%u", l, z, y);
-        printf("0x%08X:\t%-25s\tR%u=R%u/R%u=0x%08X, R%u=R%u%%R%u=0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], l, x, y, R[l], R[31]);
-    } else if (func == 0b111) { // sra - Deslocamento aritmético para a direita
-        int64_t combined = ((int64_t)R[z] << 32) | R[y];
-        int64_t result = combined >> (l + 1);
-        R[z] = (uint32_t)(result >> 32);
-        R[x] = (uint32_t)result;
-
-        ZN = (result == 0) ? 0b01000000 : 0x00000000;
-        OV = ((result & 0x80000000) != 0) ? 0b00001000 : 0x00000000;
-
-        atualizar_SR(R, ZN,ZD, SN,OV, IV,CY);
-
-        sprintf(instrucao, "sra R%u,R%u,R%u", z, x, y);
-        printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u>>%u=0x%08X:0x%08X,SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
+        printf("0x%08X:\t%-25s\tR%u:R%u=R%u*R%u=0x%08X:0x%08X, SR=0x%08X\n", R[29], instrucao, l, z, x, y, R[l], R[z], R[31]);
     }
-    break; } 
+
+    else if (func == 0b001) { // sll - Deslocamento lógico para a esquerda
+    uint64_t combined = ((uint64_t)R[z] << 32) | R[y];
+    uint64_t result = combined << (l + 1);
+    R[z] = (uint32_t)(result >> 32);
+    R[x] = (uint32_t)result;
+
+    // Atualização das flags
+
+    // Zero Flag (ZN)
+    if (result == 0) {
+        R[31] |= (1 << 6);  // Define o bit 6 se o resultado for 0
+    } else {
+        R[31] &= ~(1 << 6);  // Limpa o bit 6 se o resultado não for 0
+    }
+
+    
+    // Carry Flag (CY)
+    if ((combined >> (32 - l)) & 1) {
+        R[31] |= (1 << 0);  // Define o bit 0 se houver carry
+    } else {
+        R[31] &= ~(1 << 0);  // Limpa o bit 0 se não houver carry
+    }
+
+    // Impressão do resultado
+    sprintf(instrucao, "sll R%u,R%u,R%u", z, x, y);
+    printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u<<%u=0x%08X:0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
+}
+
+else if (func == 0b010) { // muls - Multiplicação com sinal
+    int64_t result = (int64_t)R[x] * (int64_t)R[y];
+    R[l] = (uint32_t)(result >> 32); // Parte alta
+    R[z] = (uint32_t)result;         // Parte baixa
+
+    // Atualização das flags
+
+    // Zero Flag (ZN)
+    if (result == 0) {
+        R[31] |= (1 << 6);  // Define o bit 6 se o resultado for 0
+    } else {
+        R[31] &= ~(1 << 6);  // Limpa o bit 6 se o resultado não for 0
+    }
+
+    // Overflow Flag (OV)
+    if (result != (int64_t)(int32_t)R[z]) {
+        R[31] |= (1 << 3);  // Define o bit 3 se houver overflow
+    } else {
+        R[31] &= ~(1 << 3);  // Limpa o bit 3 se não houver overflow
+    }
+
+    // Impressão do resultado
+    sprintf(instrucao, "muls R%u,R%u,R%u", l, z, y);
+    printf("0x%08X:\t%-25s\tR%u:R%u=R%u*R%u=0x%08X:0x%08X, SR=0x%08X\n", R[29], instrucao, l, z, x, y, R[l], R[z], R[31]);
+}
+
+else if (func == 0b011) { // sla - Shift aritmético para a esquerda
+    int64_t combined = ((int64_t)R[z] << 32) | R[y];
+    int64_t result = combined << (l + 1);
+    R[z] = (uint32_t)(result >> 32);
+    R[x] = (uint32_t)result;
+
+    // Atualização das flags
+
+    // Zero Flag (ZN)
+    if (result == 0) {
+        R[31] |= (1 << 6);  // Define o bit 6 se o resultado for 0
+    } else {
+        R[31] &= ~(1 << 6);  // Limpa o bit 6 se o resultado não for 0
+    }
+
+
+    // Overflow Flag (OV)
+    if (((combined & (1LL << 63)) != (result & (1LL << 63)))) {
+        R[31] |= (1 << 3);  // Define o bit 3 se houver overflow
+    } else {
+        R[31] &= ~(1 << 3);  // Limpa o bit 3 se não houver overflow
+    }
+
+    // Impressão do resultado
+    sprintf(instrucao, "sla R%u,R%u,R%u", z, x, y);
+    printf("0x%08X:\t%-25s\tR%u:R%u=R%u:R%u<<%u=0x%08X:0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, z, y, l + 1, R[z], R[x], R[31]);
+}
+
+
+else if (func == 0b100) {  // div - Divisão sem sinal
+    if (R[y] != 0) {
+        uint32_t quotient = R[x] / R[y];
+        uint32_t remainder = R[x] % R[y];
+        R[z] = quotient;
+        R[l] = remainder;
+
+        // Atualização das flags
+
+        // Zero Flag (ZN)
+        if (quotient == 0) {
+            R[31] |= (1 << 6);  // Define o bit 6 se o resultado for 0
+        } else {
+            R[31] &= ~(1 << 6);  // Limpa o bit 6 se o resultado não for 0
+        }
+
+        if (R[y] == 0) {
+        // Divisão por zero
+        R[31] |= (1 << 5);  // Define a ZD Flag (bit 5) se divisor for 0
+        R[z] = 0xFFFFFFFF;  // Opcional: Poderia definir algum valor especial para R[z] neste caso
+    } else {
+        // Divisão normal
+        R[z] = R[x] / R[y];  // Resultado da divisão
+        R[31] &= ~(1 << 5);  // Limpa a ZD Flag (bit 5) se não houver divisão por zero
+    }
+// Carry Flag (CY)
+        if ((R[x] >> (l - 1)) & 1) {
+            R[31] |= (1 << 0);  // Define o bit 0 se houver carry
+        } else {
+            R[31] &= ~(1 << 0);  // Limpa o bit 0 se não houver carry
+        }
+        // Impressão do resultado
+        sprintf(instrucao, "div R%u,R%u,R%u", z, l, y);
+        printf("0x%08X:\t%-25s\tR%u=R%u/R%u=0x%08X, R%u=R%u%%R%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], l, x, y, R[l], R[31]);
+    }}
+
+    else if (func == 0b101) { // srl - Shift lógico para a direita
+    uint32_t result = R[x] >> l;
+    R[z] = result;
+
+    // Atualização das flags
+
+    // Zero Flag (ZN)
+    if (result == 0) {
+        R[31] |= (1 << 6);  // Define o bit 6 se o resultado for 0
+    } else {
+        R[31] &= ~(1 << 6);  // Limpa o bit 6 se o resultado não for 0
+    }
+
+    // Carry Flag (CY)
+    if ((R[x] >> (l - 1)) & 1) {
+        R[31] |= (1 << 0);  // Define o bit 0 se houver carry
+    } else {
+        R[31] &= ~(1 << 0);  // Limpa o bit 0 se não houver carry
+    }
+
+    // Impressão do resultado
+    sprintf(instrucao, "srl R%u,R%u,%u", z, x, l);
+    printf("0x%08X:\t%-25s\tR%u=R%u>>%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, l, R[z], R[31]);
+}
+
+else if (func == 0b110) { // divs - Divisão com sinal
+    if (R[y] != 0) {
+        int32_t quotient = (int32_t)R[x] / (int32_t)R[y];
+        int32_t remainder = (int32_t)R[x] % (int32_t)R[y];
+        R[z] = (uint32_t)quotient;
+        R[l] = (uint32_t)remainder;
+
+        // Atualização das flags
+
+        // Zero Flag (ZN)
+        if (quotient == 0) {
+            R[31] |= (1 << 6);  // Define o bit 6 se o resultado for 0
+        } else {
+            R[31] &= ~(1 << 6);  // Limpa o bit 6 se o resultado não for 0
+        }
+
+        if (R[y] == 0) {
+        // Divisão por zero
+        R[31] |= (1 << 5);  // Define a ZD Flag (bit 5) se divisor for 0
+        R[z] = 0xFFFFFFFF;  // Opcional: Poderia definir algum valor especial para R[z] neste caso
+    } else {
+        // Divisão normal
+        R[z] = R[x] / R[y];  // Resultado da divisão
+        R[31] &= ~(1 << 5);  // Limpa a ZD Flag (bit 5) se não houver divisão por zero
+    }
+
+        // Overflow Flag (OV)
+        // Divisão com sinal pode gerar overflow ao dividir INT32_MIN por -1
+        if (R[x] == 0x80000000 && R[y] == 0xFFFFFFFF) {
+            R[31] |= (1 << 3);  // Define o bit 3 se houver overflow
+        } else {
+            R[31] &= ~(1 << 3);  // Limpa o bit 3 se não houver overflow
+        }
+
+
+
+        // Impressão do resultado
+        sprintf(instrucao, "divs R%u,R%u,R%u", z, l, y);
+        printf("0x%08X:\t%-25s\tR%u=R%u/R%u=0x%08X, R%u=R%u%%R%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, y, R[z], l, x, y, R[l], R[31]);
+    
+}}
+
+else if (func == 0b111) { // sra - Shift aritmético para a direita
+    int32_t result = (int32_t)R[x] >> l;
+    R[z] = (uint32_t)result;
+
+    // Atualização das flags
+
+    // Zero Flag (ZN)
+    if (result == 0) {
+        R[31] |= (1 << 6);  // Define o bit 6 se o resultado for 0
+    } else {
+        R[31] &= ~(1 << 6);  // Limpa o bit 6 se o resultado não for 0
+    }
+
+
+
+        // Overflow Flag (OV)
+        // Divisão com sinal pode gerar overflow ao dividir INT32_MIN por -1
+        if (R[x] == 0x80000000 && R[y] == 0xFFFFFFFF) {
+            R[31] |= (1 << 3);  // Define o bit 3 se houver overflow
+        } else {
+            R[31] &= ~(1 << 3);  // Limpa o bit 3 se não houver overflow
+        }
+
+
+    // Impressão do resultado
+    sprintf(instrucao, "sra R%u,R%u,%u", z, x, l);
+    printf("0x%08X:\t%-25s\tR%u=R%u>>%u=0x%08X, SR=0x%08X\n", R[29], instrucao, z, x, l, R[z], R[31]);
+}
+
+
+    break;
+
+}
+
+
 
 
 
@@ -685,9 +826,9 @@ case 0b011100: { // Opcode para s16
     // Verifica se o endereço está dentro dos limites da memória
     // 32 KB
         // Armazena os 16 bits do registrador R[z] na memória
-        // Armazena os 8 bits menos significativos em `addr`
+        // Armazena os 8 bits menos significativos em addr
         proj.MEM8[addr] = (uint8_t)(R[z] & 0xFF);
-        // Armazena os 8 bits mais significativos em `addr + 1`
+        // Armazena os 8 bits mais significativos em addr + 1
         proj.MEM8[addr + 1] = (uint8_t)((R[z] >> 8) & 0xFF);
 
         // Atualiza os flags de status
@@ -1218,4 +1359,5 @@ case 0b001011: { // Opcode para pop (Tipo U)
     }
 
     return 0;
+}
 }
